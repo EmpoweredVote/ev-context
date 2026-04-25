@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: compass-store-broker
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: ALLOWALL
+      - path: /*
+        name: Content-Security-Policy
+        value: "frame-ancestors https://*.empowered.vote http://localhost:* http://127.0.0.1:*"
+      - path: /*
+        name: Cache-Control
+        value: "no-store"
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
