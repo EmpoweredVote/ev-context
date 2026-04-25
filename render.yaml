@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: compass-store-broker
+    name: ev-context
     runtime: static
     buildCommand: ""
     staticPublishPath: .

@@ -3,21 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>EV Compass Store</title>
+  <title>EV Context</title>
 </head>
 <body>
 <script>
 (function () {
   'use strict';
 
-  var STORAGE_KEY = 'evCompass';
-  var CHANNEL_NAME = 'ev-compass-broker';
+  var STORAGE_KEY = 'evContext';
+  var CHANNEL_NAME = 'ev-context-broker';
 
   function isAllowedOrigin(origin) {
     if (!origin || typeof origin !== 'string') return false;
-    // Production: any *.empowered.vote subdomain (and the apex)
     if (/^https:\/\/(?:[a-z0-9-]+\.)*empowered\.vote$/i.test(origin)) return true;
-    // Dev: any localhost / 127.0.0.1 port over http
     if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
     return false;
   }
@@ -27,9 +25,7 @@
       var raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return null;
       return JSON.parse(raw);
-    } catch (e) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   function writeState(value) {
@@ -40,44 +36,33 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
       }
       return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 
-  // BroadcastChannel: notify other broker instances on this origin (other tabs)
-  // so we can fan-out an update message to every embedding app simultaneously.
   var channel = null;
-  try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (e) { /* unsupported */ }
+  try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (e) {}
 
-  // Track connected source windows so we can push updates to them.
-  // Use a WeakSet-like array (sources are MessageEventSource refs from postMessage).
   var subscribers = [];
 
   function pushUpdate(value, except) {
-    var msg = { type: 'compass-store:update', value: value };
+    var msg = { type: 'ev-context:update', value: value };
     subscribers = subscribers.filter(function (s) {
       try {
         if (s === except) return true;
         s.source.postMessage(msg, s.origin);
         return true;
-      } catch (e) {
-        return false; // dead window; drop
-      }
+      } catch (e) { return false; }
     });
   }
 
   if (channel) {
     channel.onmessage = function (ev) {
-      // Another tab's broker wrote to storage — fan out to our subscribers
       if (ev && ev.data && ev.data.type === 'broadcast:update') {
         pushUpdate(ev.data.value, null);
       }
     };
   }
 
-  // Also listen for raw localStorage changes from other tabs (covers browsers
-  // without BroadcastChannel and edge cases where channel doesn't fire).
   window.addEventListener('storage', function (ev) {
     if (ev.key !== STORAGE_KEY) return;
     var next = null;
@@ -99,19 +84,17 @@
       try { source.postMessage(payload, origin); } catch (e) {}
     }
 
-    if (type === 'compass-store:get') {
-      reply({ type: 'compass-store:value', requestId: requestId, value: readState() });
+    if (type === 'ev-context:get') {
+      reply({ type: 'ev-context:value', requestId: requestId, value: readState() });
       return;
     }
 
-    if (type === 'compass-store:set') {
+    if (type === 'ev-context:set') {
       var ok = writeState(data.value);
-      reply({ type: 'compass-store:ack', requestId: requestId, ok: ok });
+      reply({ type: 'ev-context:ack', requestId: requestId, ok: ok });
       if (ok) {
-        var subscriber = { source: source, origin: origin };
-        // De-dup the subscriber so we only push once
         var alreadyTracked = subscribers.some(function (s) { return s.source === source; });
-        if (!alreadyTracked) subscribers.push(subscriber);
+        if (!alreadyTracked) subscribers.push({ source: source, origin: origin });
         pushUpdate(data.value, source);
         if (channel) {
           try { channel.postMessage({ type: 'broadcast:update', value: data.value }); } catch (e) {}
@@ -120,16 +103,16 @@
       return;
     }
 
-    if (type === 'compass-store:subscribe') {
+    if (type === 'ev-context:subscribe') {
       var alreadySub = subscribers.some(function (s) { return s.source === source; });
       if (!alreadySub) subscribers.push({ source: source, origin: origin });
-      reply({ type: 'compass-store:value', requestId: requestId, value: readState() });
+      reply({ type: 'ev-context:value', requestId: requestId, value: readState() });
       return;
     }
 
-    if (type === 'compass-store:clear') {
+    if (type === 'ev-context:clear') {
       writeState(null);
-      reply({ type: 'compass-store:ack', requestId: requestId, ok: true });
+      reply({ type: 'ev-context:ack', requestId: requestId, ok: true });
       pushUpdate(null, source);
       if (channel) {
         try { channel.postMessage({ type: 'broadcast:update', value: null }); } catch (e) {}
@@ -138,10 +121,8 @@
     }
   });
 
-  // Signal to embedders that we're loaded and ready to accept messages.
-  // Useful for embedders to skip a race where they post before we attach.
   if (window.parent && window.parent !== window) {
-    try { window.parent.postMessage({ type: 'compass-store:ready' }, '*'); } catch (e) {}
+    try { window.parent.postMessage({ type: 'ev-context:ready' }, '*'); } catch (e) {}
   }
 }());
 </script>
