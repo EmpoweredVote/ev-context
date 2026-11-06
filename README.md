@@ -58,6 +58,6 @@ Deploy as a Render Static Site:
 1. Create a new static site at `context.empowered.vote` (or whichever subdomain you choose — the client lib defaults to `https://context.empowered.vote/`).
 2. Build command: empty
 3. Publish directory: `.`
-4. The `render.yaml` in this repo sets the `frame-ancestors` CSP and `X-Frame-Options: ALLOWALL` so other EV subdomains can iframe it.
+4. Response headers: none are set on the live site, so any page can iframe it. To limit embedding to EV subdomains, add a `Content-Security-Policy: frame-ancestors https://*.empowered.vote` header in the Render dashboard.
 
 That's it — there's no build step. Once deployed, every EV app importing `evContext` from `@empoweredvote/ev-ui` automatically picks it up.
